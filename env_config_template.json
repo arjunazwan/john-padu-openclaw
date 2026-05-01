@@ -1,0 +1,55 @@
+{
+  "agent_identity": {
+    "name": "John Padu",
+    "version": "johnpadu_v1",
+    "id": "john-padu-core"
+  },
+  "provider_config": {
+    "preferred": "local|ollama|openai|anthropic",
+    "fallback_order": ["local", "ollama", "openai"],
+    "api_keys": {
+      "openai": "{{OPENAI_API_KEY}}",
+      "anthropic": "{{ANTHROPIC_API_KEY}}"
+    },
+    "note": "Do NOT store real API keys in this file for production. Use OS keychain or environment variables. Placeholders above are for template only."
+  },
+  "path_manifest": {
+    "home": "{{HOME}}",
+    "gdrive_root": "{{GD_PATH}}",
+    "obsidian_vault_root": "{{GD_PATH}}/My_Obsidian_Vault",
+    "workspace_root": "{{HOME}}/.openclaw/workspace",
+    "daily_log_dir": "{{GD_PATH}}/My_Obsidian_Vault/System/JohnPADU/Daily_Log",
+    "log_master": "{{GD_PATH}}/My_Obsidian_Vault/System/JohnPADU/John PADU — Log Master.md",
+    "media_dir": "{{GD_PATH}}/My_Obsidian_Vault/System/JohnPADU/media"
+  },
+  "backup": {
+    "smart_backup_enabled": true,
+    "daily_backup_time_local": "23:00",
+    "versioning": "YYYY-MM/YYYY-MM-DD-Session-NN.md",
+    "generated_marker": "<!-- generated-by: openclaw-session-backup -->"
+  },
+  "dedupe_policy": {
+    "similarity_threshold": 0.2,
+    "exact_duplicate_check": true,
+    "log_master_pointer_on_duplication": true
+  },
+  "agent_policy": {
+    "consult_knowledge_map_before_write": true,
+    "allowed_writes": {
+      "knowledge_map": "edit-with-approval",
+      "daily_log": "create-new-files",
+      "log_master": "append-only"
+    }
+  },
+  "runtime": {
+    "python": "/usr/bin/python3",
+    "node": "/usr/local/bin/node"
+  },
+  "notes": {
+    "placeholders": {
+      "HOME": "OS home directory, e.g. /Users/yourname",
+      "GD_PATH": "Google Drive/Cloud root path mounted locally. Example: /Users/yourname/Library/CloudStorage/GoogleDrive-.../My Drive/"
+    },
+    "security": "Keep secrets out of this file. Use keychain or env vars."
+  }
+}
