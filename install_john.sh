@@ -416,6 +416,130 @@ module_integrate() {
   info "Module 3 complete."
 }
 
+# --- Module 4: Super Memory Structure & Heartbeat Sync ---
+
+create_memory_structure() {
+  info "Module4: Ensuring memory structure..."
+  # If memory is a symlink, resolving it to find the real directory
+  local mem_root
+  mem_root=$(python3 -c "import os; print(os.path.realpath('$WORKSPACE_DIR/memory'))")
+  local dirs=( "business" "personal" "technical" "projects" )
+  mkdir -p "$mem_root"
+  for d in "${dirs[@]}"; do
+    if [ -d "$mem_root/$d" ]; then
+      info "Exists: memory/$d"
+    else
+      mkdir -p "$mem_root/$d"
+      info "Created: memory/$d"
+    fi
+  done
+
+  # JOURNAL.md at root of memory/ (idempotent)
+  local journal="$mem_root/JOURNAL.md"
+  if [ -f "$journal" ]; then
+    info "JOURNAL.md already present"
+  else
+    cat > "$journal" <<'JHDR'
+# JOURNAL
+
+This file records end-of-session summaries. Each session append: YYYY-MM-DD — short summary.
+
+JHDR
+    info "Created: memory/JOURNAL.md"
+    chmod 600 "$journal" || true
+  fi
+
+  # Projects: create PROJECT_JOHN_UPGRADE folder and initial note (idempotent)
+  local project_dir="$mem_root/projects/PROJECT_JOHN_UPGRADE"
+  if [ -d "$project_dir" ]; then
+    info "Project exists: projects/PROJECT_JOHN_UPGRADE"
+  else
+    mkdir -p "$project_dir"
+    cat > "$project_dir/NOTES.md" <<'PN'
+# PROJECT_JOHN_UPGRADE
+
+Focus: Frontend + Supabase Research
+- Objective: evaluate frontend frameworks + Supabase integration patterns
+- Tasks:
+  - Survey lightweight SPA frameworks (Svelte/Preact/HTM)
+  - Prototype auth and DB model with Supabase
+  - Evaluate realtime listeners + edge functions
+- Initial notes: start with small PoC for auth + a 'notes' table
+
+PN
+    info "Created project: projects/PROJECT_JOHN_UPGRADE with NOTES.md"
+    chmod 600 "$project_dir/NOTES.md" || true
+  fi
+}
+
+heartbeat_sync_openclaw() {
+  info "Module4: Heartbeat Sync — updating openclaw.json files (with backups)."
+  local ts
+  ts=$(date +%Y%m%d_%H%M%S)
+  local backup_dir="$ARCHIVE_DIR/openclaw_backups/$ts"
+  mkdir -p "$backup_dir"
+
+  # search roots: workspace, home, home/.openclaw, /etc
+  local roots=( "$WORKSPACE_DIR" "$HOME" "$HOME/.openclaw" "/etc" )
+  # find all openclaw.json files
+  while IFS= read -r -d '' file; do
+    [ -f "$file" ] || continue
+    info "Checking: $file"
+
+    python3 - <<'PYTHON' "$file" "$WORKSPACE_DIR" "$backup_dir"
+import json, shutil, sys, os
+fpath = sys.argv[1]
+ws = sys.argv[2]
+bkdir = sys.argv[3]
+try:
+    with open(fpath, 'r', encoding='utf-8') as fh:
+        data = json.load(fh)
+except Exception as e:
+    sys.exit(0) # Skip silently for non-JSON or unreadable
+
+orig = json.dumps(data, sort_keys=True)
+# Ensure path_manifest exists
+pm = data.get('path_manifest', {})
+# Only update if it's actually an OpenClaw config (has path_manifest or agent_identity)
+if not pm and 'agent_identity' not in data:
+    sys.exit(0)
+
+pm['workspace_root'] = ws
+data['path_manifest'] = pm
+
+# Ensure agent_identity exists
+ai = data.get('agent_identity', {})
+ai['name'] = "John PADU"
+data['agent_identity'] = ai
+
+new = json.dumps(data, sort_keys=True)
+if orig == new:
+    sys.exit(0)
+
+# backup original
+os.makedirs(bkdir, exist_ok=True)
+# simple flat backup naming to avoid path nesting issues in archive
+bkname = os.path.join(bkdir, fpath.replace('/', '_'))
+shutil.copy2(fpath, bkname)
+
+# write updated file (preserve pretty formatting)
+with open(fpath, 'w', encoding='utf-8') as fh:
+    json.dump(data, fh, indent=2, ensure_ascii=False)
+
+print(f"  [UPDATED] {fpath}")
+PYTHON
+  done < <(find "${roots[@]}" -type f -name 'openclaw.json' -print0 2>/dev/null || true)
+
+  info "Heartbeat Sync complete. Backups stored in: $backup_dir"
+}
+
+module_heartbeat() {
+  info "Running Module 4: Super Memory Structure & Heartbeat"
+  create_memory_structure
+  heartbeat_sync_openclaw
+  info "Module 4 complete."
+}
+
 # Main preflight module
 module_preflight() {
   info "Running Module 1: Pre-flight checks..."
@@ -449,6 +573,7 @@ Commands:
   all         Run all modules (preflight -> install -> integrate)
   snapshot    Create a manual backup
   discovery   Force run john_discovery.py
+  heartbeat   Run Module 4 (Memory structure & Heartbeat Sync)
   help        Show this help
 
 Behavior:
@@ -466,8 +591,11 @@ USAGE
   integrate)
     module_integrate
     ;;
+  heartbeat)
+    module_heartbeat
+    ;;
   all|"")
-    module_preflight && module_install && module_integrate
+    module_preflight && module_install && module_integrate && module_heartbeat
     ;;
   snapshot)
     create_snapshot
