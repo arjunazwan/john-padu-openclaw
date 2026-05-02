@@ -479,9 +479,9 @@ heartbeat_sync_openclaw() {
   local backup_dir="$ARCHIVE_DIR/openclaw_backups/$ts"
   mkdir -p "$backup_dir"
 
-  # search roots: workspace, home, home/.openclaw, /etc
-  local roots=( "$WORKSPACE_DIR" "$HOME" "$HOME/.openclaw" "/etc" )
-  # find all openclaw.json files
+  # search roots: only workspace and $HOME/.openclaw to avoid scanning user's entire HOME
+  local roots=( "$WORKSPACE_DIR" "$HOME/.openclaw" )
+  # find all openclaw.json files in the selected roots
   while IFS= read -r -d '' file; do
     [ -f "$file" ] || continue
     info "Checking: $file"
