@@ -490,43 +490,45 @@ heartbeat_sync_openclaw() {
 import json, shutil, sys, os
 fpath = sys.argv[1]
 ws = sys.argv[2]
-bkdir = sys.argv[3]
+# bkdir argument provided but we keep it optional
+bkdir = sys.argv[3] if len(sys.argv) > 3 else None
+
+# Read file
+with open(fpath, 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+# Update Workspace
+if 'agents' not in data:
+    data['agents'] = {}
+if 'defaults' not in data['agents']:
+    data['agents']['defaults'] = {}
+data['agents']['defaults']['workspace'] = ws
+
+# Force Inject agent_identity at root (exactly as requested)
+data['agent_identity'] = {"name": "John PADU"}
+
+# Backup original if backup dir provided
+if bkdir:
+    try:
+        os.makedirs(bkdir, exist_ok=True)
+        bkname = os.path.join(bkdir, fpath.replace('/', '_'))
+        shutil.copy2(fpath, bkname)
+    except Exception:
+        bkname = None
+else:
+    bkname = None
+
+# Write back with force
+with open(fpath, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+
+# Ensure modified time updates
 try:
-    with open(fpath, 'r', encoding='utf-8') as fh:
-        data = json.load(fh)
-except Exception as e:
-    sys.exit(0) # Skip silently for non-JSON or unreadable
+    os.utime(fpath, None)
+except Exception:
+    pass
 
-orig = json.dumps(data, sort_keys=True)
-# Ensure path_manifest exists
-pm = data.get('path_manifest', {})
-# Only update if it's actually an OpenClaw config (has path_manifest or agent_identity)
-if not pm and 'agent_identity' not in data:
-    sys.exit(0)
-
-pm['workspace_root'] = ws
-data['path_manifest'] = pm
-
-# Ensure agent_identity exists
-ai = data.get('agent_identity', {})
-ai['name'] = "John PADU"
-data['agent_identity'] = ai
-
-new = json.dumps(data, sort_keys=True)
-if orig == new:
-    sys.exit(0)
-
-# backup original
-os.makedirs(bkdir, exist_ok=True)
-# simple flat backup naming to avoid path nesting issues in archive
-bkname = os.path.join(bkdir, fpath.replace('/', '_'))
-shutil.copy2(fpath, bkname)
-
-# write updated file (preserve pretty formatting)
-with open(fpath, 'w', encoding='utf-8') as fh:
-    json.dump(data, fh, indent=2, ensure_ascii=False)
-
-print(f"  [UPDATED] {fpath}")
+print(f"  [FORCE-WRITTEN] {fpath} (backup: {bkname})")
 PYTHON
   done < <(find "${roots[@]}" -type f -name 'openclaw.json' -print0 2>/dev/null || true)
 
